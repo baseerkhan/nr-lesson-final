@@ -152,7 +152,8 @@ def main():
         st.header("Function Calling Demo")
         
         # Initialize OpenAI client
-        client = OpenAI(api_key=get_openai_api_key())
+        api_key = get_openai_api_key()
+        client = OpenAI(api_key=api_key)
         
         st.markdown("""
         This demo shows how an LLM can use function calling to perform tasks.

@@ -34,7 +34,8 @@ def main():
         return
     
     # Initialize OpenAI client
-    client = OpenAI(api_key=get_openai_api_key())
+    api_key = get_openai_api_key()
+    client = OpenAI(api_key=api_key)
     
     # Initialize memory system
     memory_system = MemorySystem()

@@ -18,9 +18,12 @@ from .config import DATA_DIR, get_openai_api_key
 class EmbeddingManager:
     """Manage embeddings with Excel storage"""
     
-    def __init__(self, embedding_file: str = "knowledge_base.xlsx"):
+    def __init__(self, embedding_file: str = "knowledge_base.xlsx", use_api: bool = True):
         """Initialize the embedding manager"""
-        self.client = OpenAI(api_key=get_openai_api_key())
+        self.use_api = use_api
+        api_key = get_openai_api_key() if use_api else None
+        # Initialize the OpenAI client with the API key if we're using the API
+        self.client = OpenAI(api_key=api_key) if use_api else None
         self.embedding_path = DATA_DIR / embedding_file
         self._ensure_data_dir()
         
@@ -29,10 +32,14 @@ class EmbeddingManager:
         os.makedirs(DATA_DIR, exist_ok=True)
     
     def _create_embedding(self, text: str) -> List[float]:
-        """Create embedding for a text using OpenAI API"""
+        """Create embedding for a text using OpenAI API or a local fallback"""
+        # If we're not using the API or if there's an API error, use fallback approach
+        if not self.use_api:
+            return self._create_fallback_embedding(text)
+            
         try:
             # Print debug info
-            print(f"Creating embedding for text: '{text[:50]}...'")
+            print(f"Creating embedding for text: '{text[:50]}...'") 
             
             # Create embedding
             response = self.client.embeddings.create(
@@ -43,8 +50,8 @@ class EmbeddingManager:
             # Check if response has data
             if not response.data:
                 print("WARNING: Empty embedding response data from OpenAI")
-                # Return empty vector as fallback
-                return [0.0] * 1536  # Standard size for ada-002
+                # Return fallback vector
+                return self._create_fallback_embedding(text)
                 
             embedding = response.data[0].embedding
             print(f"Embedding created successfully, length: {len(embedding)}")
@@ -52,8 +59,35 @@ class EmbeddingManager:
             return embedding
         except Exception as e:
             print(f"ERROR creating embedding: {e}")
-            # Return empty vector as fallback
-            return [0.0] * 1536  # Standard size for ada-002
+            # Switch to fallback mode for this session
+            print("Switching to fallback embedding mode due to API error")
+            self.use_api = False
+            return self._create_fallback_embedding(text)
+            
+    def _create_fallback_embedding(self, text: str) -> List[float]:
+        """Create a simple fallback embedding when API is unavailable"""
+        import hashlib
+        import numpy as np
+        
+        print("Using fallback embedding method (no API call)")
+        
+        # Use a hash-based approach to generate deterministic pseudo-embeddings
+        # This won't have the semantic properties of real embeddings but works for demos
+        text_hash = hashlib.sha256(text.encode()).digest()
+        
+        # Generate a deterministic random seed from the hash
+        seed = int.from_bytes(text_hash[:4], byteorder='big')
+        np.random.seed(seed)
+        
+        # Generate a pseudo-random embedding vector
+        embedding = np.random.normal(0, 0.1, 1536).tolist()
+        
+        # Normalize the vector
+        norm = sum(x*x for x in embedding) ** 0.5
+        if norm > 0:
+            embedding = [x/norm for x in embedding]
+            
+        return embedding
     
     def _cosine_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
         """Calculate cosine similarity between two embeddings"""

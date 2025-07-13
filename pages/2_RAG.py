@@ -18,7 +18,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from utils.rag import RAGSystem
 from utils.embedding import EmbeddingManager
-from utils.config import configure_openai, DATA_DIR
+from utils.config import get_openai_api_key, get_api_mode, configure_openai, DATA_DIR
 
 def main():
     st.title("Retrieval Augmented Generation (RAG)")
@@ -89,7 +89,8 @@ def main():
         \"\"\"
         
         # 4. Generate response with LLM
-        client = OpenAI()
+        api_key = get_openai_api_key()
+        client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -102,8 +103,13 @@ def main():
     with tab2:
         st.header("RAG Demo")
         
-        # Initialize RAG system with debugging
-        embedding_manager = EmbeddingManager()
+        # Initialize RAG system
+        use_api = get_api_mode()  # Get current API mode setting
+        embedding_manager = EmbeddingManager(use_api=use_api)
+        rag_system = RAGSystem(embedding_manager=embedding_manager, use_api=use_api)
+        
+        if not use_api:
+            st.warning("⚠️ Running in fallback mode - responses will be limited but won't use API quota")
         
         # Debug: Check knowledge base status
         kb_path = DATA_DIR / "knowledge_base.xlsx"

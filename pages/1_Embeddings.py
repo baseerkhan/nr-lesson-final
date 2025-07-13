@@ -36,7 +36,8 @@ def main():
         return
     
     # Initialize OpenAI client
-    client = OpenAI(api_key=get_openai_api_key())
+    api_key = get_openai_api_key()
+    client = OpenAI(api_key=api_key)
     
     # Tabs for different sections
     tab1, tab2, tab3 = st.tabs(["What are Embeddings?", "Embedding Demo", "Visualize Embeddings"])

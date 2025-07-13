@@ -12,10 +12,14 @@ from .config import get_openai_api_key
 class RAGSystem:
     """Implements Retrieval Augmented Generation using the embedding manager"""
     
-    def __init__(self, embedding_manager: EmbeddingManager = None):
+    def __init__(self, embedding_manager: EmbeddingManager = None, use_api: bool = True):
         """Initialize the RAG system"""
-        self.client = OpenAI(api_key=get_openai_api_key())
-        self.embedding_manager = embedding_manager or EmbeddingManager()
+        self.use_api = use_api
+        api_key = get_openai_api_key() if use_api else None
+        # Initialize the OpenAI client with API key if we're using the API
+        self.client = OpenAI(api_key=api_key) if use_api else None
+        # Use the same API flag for the embedding manager
+        self.embedding_manager = embedding_manager or EmbeddingManager(use_api=use_api)
     
     def query(self, user_question: str, top_k: int = 3) -> Dict[str, Any]:
         """Process a user query using RAG"""
@@ -98,13 +102,45 @@ class RAGSystem:
             print(f"DEBUG - Top doc similarity score: {similar_docs[0]['similarity']:.4f}")
             print(f"DEBUG - Top doc title: {similar_docs[0]['metadata'].get('title', 'No title')}")
         
-        # Step 4: Generate a response using the LLM
-        response = self.client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            temperature=0.3,
-            max_tokens=500
-        )
+        # Step 4: Generate a response using the LLM or fallback
+        try:
+            if not self.use_api:
+                raise Exception("API mode is disabled, using fallback")
+                
+            # Attempt to use the API
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                temperature=0.3,
+                max_tokens=500
+            )
+        except Exception as e:
+            print(f"Error generating response with API: {e}")
+            print("Using fallback response generation")
+            # Switch to fallback mode for future queries
+            self.use_api = False
+            
+            # Create a basic fallback response based on retrieved documents
+            fallback_response = self._generate_fallback_response(user_question, similar_docs)
+            
+            # Create a mock response object with the same structure
+            class MockResponse:
+                def __init__(self, content):
+                    self.model = "fallback-model"
+                    self.choices = [MockChoice(content)]
+                    self.usage = None
+                    
+            class MockChoice:
+                def __init__(self, content):
+                    self.message = MockMessage(content)
+                    self.finish_reason = "stop"
+                    
+            class MockMessage:
+                def __init__(self, content):
+                    self.content = content
+                    self.role = "assistant"
+            
+            response = MockResponse(fallback_response)
         
         # Step 5: Return the answer along with the retrieved context and conversation details
         return {
@@ -133,6 +169,24 @@ class RAGSystem:
             }
         }
     
+    def _generate_fallback_response(self, user_question: str, documents: List[Dict[str, Any]]) -> str:
+        """Generate a simple response based on retrieved documents without using the API"""
+        if not documents:
+            return "I'm sorry, but I couldn't find any relevant information to answer your question. The system is currently running in offline mode due to API quota limitations."
+        
+        # Get the most relevant document
+        most_relevant = documents[0]
+        document_text = most_relevant.get('text', '')
+        similarity = most_relevant.get('similarity', 0)
+        title = most_relevant.get('metadata', {}).get('title', 'Document')
+        
+        # For very low similarity matches, don't try to answer
+        if similarity < 0.5:
+            return f"I'm running in offline mode due to API quota limitations. I found some documents that might be related to your question, but they don't seem to directly answer it. The most relevant document was '{title}', but it may not contain the specific answer you're looking for."
+        
+        # For reasonable matches, provide the document text
+        return f"I'm running in offline mode due to API quota limitations. Based on the information I have, here's what I found about your question:\n\n{document_text}\n\nThis information comes from: {title}"
+        
     def add_to_knowledge_base(self, text: str, metadata: Dict[str, Any] = None) -> str:
         """Add a document to the knowledge base"""
         return self.embedding_manager.add_document(text, metadata)

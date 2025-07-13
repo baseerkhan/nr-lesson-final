@@ -139,6 +139,22 @@ def main():
             st.success("API Key set successfully!")
         else:
             st.warning("Please enter your OpenAI API Key to use all features")
+            
+        # API mode toggle
+        st.divider()
+        st.header("API Mode Settings")
+        use_api = st.toggle("Use OpenAI API", value=True, help="Turn off to use fallback mode without API calls")
+        st.session_state["use_api_mode"] = use_api
+        
+        if not use_api:
+            st.info("⚠️ Running in fallback mode - no API calls will be made")
+            st.warning("Responses will be limited in quality but won't consume API quota")
+        else:
+            st.success("✅ Using OpenAI API for all operations")
+            if api_key:
+                st.info("Make sure your API key has sufficient quota")
+            else:
+                st.warning("API key required when API mode is enabled")
         
         # Check for MCP server
         st.divider()

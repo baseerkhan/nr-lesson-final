@@ -17,7 +17,9 @@ class MCPToolCaller:
     def __init__(self, server_url: str = MCP_SERVER_URL):
         """Initialize the MCP tool caller"""
         self.server_url = server_url
-        self.client = OpenAI(api_key=get_openai_api_key())
+        api_key = get_openai_api_key()
+        # Initialize the OpenAI client with API key
+        self.client = OpenAI(api_key=api_key)
         
     def list_available_tools(self) -> List[Dict[str, Any]]:
         """Get a list of available tools from the MCP server"""

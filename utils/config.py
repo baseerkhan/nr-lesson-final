@@ -16,6 +16,15 @@ DATA_DIR = ROOT_DIR / "data"
 # MCP Server settings
 MCP_SERVER_URL = "http://127.0.0.1:8000"
 
+# API Mode settings
+USE_API_SESSION_KEY = "use_api_mode"
+
+def get_api_mode():
+    """Get whether to use the API or fallback mode"""
+    if hasattr(st.session_state, USE_API_SESSION_KEY):
+        return st.session_state[USE_API_SESSION_KEY]
+    return True  # Default to using API
+
 def get_openai_api_key():
     """Get OpenAI API key from environment or session state"""
     # First check session state
@@ -37,8 +46,16 @@ def configure_openai():
     """Configure OpenAI with API key"""
     api_key = get_openai_api_key()
     if api_key:
+        # Store the API key in environment variable
         os.environ["OPENAI_API_KEY"] = api_key
-        print(f"DEBUG: Successfully configured OpenAI with key: {api_key[:4]}...{api_key[-4:] if len(api_key) > 8 else ''}")
+        
+        # Check if the key appears to be a project-scoped API key
+        if api_key.startswith('sk-proj-'):
+            print(f"DEBUG: Detected project-scoped API key: {api_key[:8]}...{api_key[-4:] if len(api_key) > 12 else ''}")
+            # Project-scoped API keys are already correctly formatted
+        else:
+            print(f"DEBUG: Successfully configured OpenAI with key: {api_key[:4]}...{api_key[-4:] if len(api_key) > 8 else ''}")
+        
         return True
     print("DEBUG: Failed to configure OpenAI - no valid API key found")
     return False
